@@ -12,10 +12,8 @@ import torch
 import soundfile as sf
 import torch.nn as nn
 from utils import demix_track, get_model_from_config
-
 import warnings
 warnings.filterwarnings("ignore")
-
 
 def run_folder(model, args, config, device, verbose=False):
     start_time = time.time()
@@ -29,51 +27,58 @@ def run_folder(model, args, config, device, verbose=False):
         instruments = [config.training.target_instrument]
 
     if not os.path.isdir(args.store_dir):
-        os.mkdir(args.store_dir)
+        os.makedirs(args.store_dir)
 
     if not verbose:
         all_mixtures_path = tqdm(all_mixtures_path)
 
     first_chunk_time = None
 
+    files_in_store = os.listdir(args.store_dir)
+
     for track_number, path in enumerate(all_mixtures_path, 1):
         print(f"\nProcessing track {track_number}/{total_tracks}: {os.path.basename(path)}")
 
-        mix, sr = sf.read(path)
-        original_mono = False
-        if len(mix.shape) == 1:
-            original_mono = True
-            mix = np.stack([mix, mix], axis=-1)
+        matching_files_in_store = [f for f in files_in_store if f.startswith(os.path.basename(path)[:-4])]
+        if args.skip_already_processed and len(matching_files_in_store)>0: # User can use the "--skip_already_processed" to skip files that have already been processed
+            print(f"\nThere are matching files in output folder ({matching_files_in_store}), skipping since 'skip_already_processed' is used")
+            continue
+        else:
+            mix, sr = sf.read(path)
+            original_mono = False
+            if len(mix.shape) == 1:
+                original_mono = True
+                mix = np.stack([mix, mix], axis=-1)
 
-        mixture = torch.tensor(mix.T, dtype=torch.float32)
+            mixture = torch.tensor(mix.T, dtype=torch.float32)
 
-        if first_chunk_time is not None:
-            total_length = mixture.shape[1]
-            num_chunks = (total_length + config.inference.chunk_size // config.inference.num_overlap - 1) // (config.inference.chunk_size // config.inference.num_overlap)
-            estimated_total_time = first_chunk_time * num_chunks
-            print(f"Estimated total processing time for this track: {estimated_total_time:.2f} seconds")
-            sys.stdout.write(f"Estimated time remaining: {estimated_total_time:.2f} seconds\r")
-            sys.stdout.flush()
+            if first_chunk_time is not None:
+                total_length = mixture.shape[1]
+                num_chunks = (total_length + config.inference.chunk_size // config.inference.num_overlap - 1) // (config.inference.chunk_size // config.inference.num_overlap)
+                estimated_total_time = first_chunk_time * num_chunks
+                print(f"Estimated total processing time for this track: {estimated_total_time:.2f} seconds")
+                sys.stdout.write(f"Estimated time remaining: {estimated_total_time:.2f} seconds\r")
+                sys.stdout.flush()
 
-        res, first_chunk_time = demix_track(config, model, mixture, device, first_chunk_time)
+            res, first_chunk_time = demix_track(config, model, mixture, device, first_chunk_time)
 
-        for instr in instruments:
-            vocals_output = res[instr].T
+            for instr in instruments:
+                vocals_output = res[instr].T
+                if original_mono:
+                    vocals_output = vocals_output[:, 0]
+
+                vocals_path = "{}/{}_{}.wav".format(args.store_dir, os.path.basename(path)[:-4], instr)
+                sf.write(vocals_path, vocals_output, sr, subtype='FLOAT')
+
+            vocals_output = res[instruments[0]].T
             if original_mono:
                 vocals_output = vocals_output[:, 0]
 
-            vocals_path = "{}/{}_{}.wav".format(args.store_dir, os.path.basename(path)[:-4], instr)
-            sf.write(vocals_path, vocals_output, sr, subtype='FLOAT')
+            original_mix, _ = sf.read(path)
+            instrumental = original_mix - vocals_output
 
-        vocals_output = res[instruments[0]].T
-        if original_mono:
-            vocals_output = vocals_output[:, 0]
-
-        original_mix, _ = sf.read(path)
-        instrumental = original_mix - vocals_output
-
-        instrumental_path = "{}/{}_instrumental.wav".format(args.store_dir, os.path.basename(path)[:-4])
-        sf.write(instrumental_path, instrumental, sr, subtype='FLOAT')
+            instrumental_path = "{}/{}_instrumental.wav".format(args.store_dir, os.path.basename(path)[:-4])
+            sf.write(instrumental_path, instrumental, sr, subtype='FLOAT')
 
     time.sleep(1)
     print("Elapsed time: {:.2f} sec".format(time.time() - start_time))
@@ -87,6 +92,7 @@ def proc_folder(args):
     parser.add_argument("--input_folder", type=str, help="folder with songs to process")
     parser.add_argument("--store_dir", default="", type=str, help="path to store model outputs")
     parser.add_argument("--device_ids", nargs='+', type=int, default=0, help='list of gpu ids')
+    parser.add_argument("--skip_already_processed", action='store_true', help='skip files where an output file with similar name already exists in the store_dir')
     if args is None:
         args = parser.parse_args()
     else:
@@ -113,7 +119,7 @@ def proc_folder(args):
             device = torch.device(f'cuda:{device_ids[0]}')
             model = nn.DataParallel(model, device_ids=device_ids).to(device)
     else:
-        device = 'cpu'
+        device = torch.device('cpu')
         print('CUDA is not available. Run inference on CPU. It will be very slow...')
         model = model.to(device)
 
