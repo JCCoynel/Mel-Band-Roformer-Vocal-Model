@@ -69,6 +69,12 @@ def run_folder(model, args, config, device, verbose=False):
 
                 vocals_path = "{}/{}_{}.wav".format(args.store_dir, os.path.basename(path)[:-4], instr)
                 sf.write(vocals_path, vocals_output, sr, subtype='FLOAT')
+                if args.output_as_flac:
+                    # Convert to flac
+                    from pydub import AudioSegment
+                    song = AudioSegment.from_wav(vocals_path)
+                    song.export(f"{vocals_path[:-4]}.flac", format="flac")
+                    os.remove(vocals_path)                
 
             vocals_output = res[instruments[0]].T
             if original_mono:
@@ -79,6 +85,13 @@ def run_folder(model, args, config, device, verbose=False):
 
             instrumental_path = "{}/{}_instrumental.wav".format(args.store_dir, os.path.basename(path)[:-4])
             sf.write(instrumental_path, instrumental, sr, subtype='FLOAT')
+
+            if args.output_as_flac:
+                # Convert to flac
+                from pydub import AudioSegment
+                song = AudioSegment.from_wav(instrumental_path)
+                song.export(f"{instrumental_path[:-4]}.flac", format="flac")
+                os.remove(instrumental_path)
 
     time.sleep(1)
     print("Elapsed time: {:.2f} sec".format(time.time() - start_time))
@@ -93,6 +106,7 @@ def proc_folder(args):
     parser.add_argument("--store_dir", default="", type=str, help="path to store model outputs")
     parser.add_argument("--device_ids", nargs='+', type=int, default=0, help='list of gpu ids')
     parser.add_argument("--skip_already_processed", action='store_true', help='skip files where an output file with similar name already exists in the store_dir')
+    parser.add_argument("--output_as_flac", action='store_true', help='generates flac files instead of wav')
     if args is None:
         args = parser.parse_args()
     else:
