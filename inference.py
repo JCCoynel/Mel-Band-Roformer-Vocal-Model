@@ -19,6 +19,8 @@ def run_folder(model, args, config, device, verbose=False):
     start_time = time.time()
     model.eval()
     all_mixtures_path = glob.glob(args.input_folder + '/*.wav')
+    if args.read_flac_files: #reads flac files as input (in addition to the default WAV)
+        all_mixtures_path += glob.glob(args.input_folder + '/*.flac')
     total_tracks = len(all_mixtures_path)
     print('Total tracks found: {}'.format(total_tracks))
 
@@ -67,14 +69,16 @@ def run_folder(model, args, config, device, verbose=False):
                 if original_mono:
                     vocals_output = vocals_output[:, 0]
 
-                vocals_path = "{}/{}_{}.wav".format(args.store_dir, os.path.basename(path)[:-4], instr)
+                vocals_path = "{}/{}_{}.wav".format(args.store_dir, ".".join(os.path.basename(path).split('.')[:-1]), instr)
+                print(f"vocals_path: {vocals_path}")
+                print(f"path: {path}")
                 sf.write(vocals_path, vocals_output, sr, subtype='FLOAT')
                 if args.output_as_flac:
                     # Convert to flac
                     from pydub import AudioSegment
                     song = AudioSegment.from_wav(vocals_path)
                     song.export(f"{vocals_path[:-4]}.flac", format="flac")
-                    os.remove(vocals_path)                
+                    os.remove(vocals_path)
 
             vocals_output = res[instruments[0]].T
             if original_mono:
@@ -85,7 +89,6 @@ def run_folder(model, args, config, device, verbose=False):
 
             instrumental_path = "{}/{}_instrumental.wav".format(args.store_dir, os.path.basename(path)[:-4])
             sf.write(instrumental_path, instrumental, sr, subtype='FLOAT')
-
             if args.output_as_flac:
                 # Convert to flac
                 from pydub import AudioSegment
@@ -107,6 +110,7 @@ def proc_folder(args):
     parser.add_argument("--device_ids", nargs='+', type=int, default=0, help='list of gpu ids')
     parser.add_argument("--skip_already_processed", action='store_true', help='skip files where an output file with similar name already exists in the store_dir')
     parser.add_argument("--output_as_flac", action='store_true', help='generates flac files instead of wav')
+    parser.add_argument("--read_flac_files", action='store_true', help='reads flac files as input (in addition to the default WAV')
     if args is None:
         args = parser.parse_args()
     else:
