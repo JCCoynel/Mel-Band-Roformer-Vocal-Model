@@ -70,8 +70,6 @@ def run_folder(model, args, config, device, verbose=False):
                     vocals_output = vocals_output[:, 0]
 
                 vocals_path = "{}/{}_{}.wav".format(args.store_dir, ".".join(os.path.basename(path).split('.')[:-1]), instr)
-                print(f"vocals_path: {vocals_path}")
-                print(f"path: {path}")
                 sf.write(vocals_path, vocals_output, sr, subtype='FLOAT')
                 if args.output_as_flac:
                     # Convert to flac
