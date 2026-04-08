@@ -75,8 +75,9 @@ def run_folder(model, args, config, device, verbose=False):
                     # Convert to flac
                     from pydub import AudioSegment
                     song = AudioSegment.from_wav(vocals_path)
-                    song.export(f"{vocals_path[:-4]}.flac", format="flac")
+                    song.export(f"{vocals_path[:-4]}.flac", format="flac", parameters=["-compression_level", str(args.flac_compression_level)])
                     os.remove(vocals_path)
+                    print(f"Saved vocals to {vocals_path[:-4]}.flac (compressed with level {args.flac_compression_level})")
 
             vocals_output = res[instruments[0]].T
             if original_mono:
@@ -91,8 +92,9 @@ def run_folder(model, args, config, device, verbose=False):
                 # Convert to flac
                 from pydub import AudioSegment
                 song = AudioSegment.from_wav(instrumental_path)
-                song.export(f"{instrumental_path[:-4]}.flac", format="flac")
+                song.export(f"{instrumental_path[:-4]}.flac", format="flac", parameters=["-compression_level", str(args.flac_compression_level)])
                 os.remove(instrumental_path)
+                print(f"Saved instrumental to {instrumental_path[:-4]}.flac (compressed with level {args.flac_compression_level})")
 
     time.sleep(1)
     print("Elapsed time: {:.2f} sec".format(time.time() - start_time))
@@ -108,6 +110,7 @@ def proc_folder(args):
     parser.add_argument("--device_ids", nargs='+', type=int, default=0, help='list of gpu ids')
     parser.add_argument("--skip_already_processed", action='store_true', help='skip files where an output file with similar name already exists in the store_dir')
     parser.add_argument("--output_as_flac", action='store_true', help='generates flac files instead of wav')
+    parser.add_argument("--flac_compression_level", type=int, default=12, help='defines the compression level for the flac files generated with --output_as_flac (between 0 and 12, where 12 is the slowest compression but smallest file size). Only used if --output_as_flac is set. Default is 12.')
     parser.add_argument("--read_flac_files", action='store_true', help='reads flac files as input (in addition to the default WAV')
     if args is None:
         args = parser.parse_args()
