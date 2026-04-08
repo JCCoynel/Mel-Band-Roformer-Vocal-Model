@@ -1,4 +1,4 @@
-This is a fork of https://github.com/KimberleyJensen/Mel-Band-Roformer-Vocal-Model, with a few small improvements, mostly to deal with the (flac)[https://xiph.org/flac/] format :
+This is a fork of https://github.com/KimberleyJensen/Mel-Band-Roformer-Vocal-Model, with a few small improvements, mostly to deal with the [flac](https://xiph.org/flac/) format :
  - `--skip_already_processed` : skips files where an output file with similar name already exists in the store_dir
  - `--read_flac_files` : reads flac files as input (in addition to the default WAV)
  - `--output_as_flac` : generates flac files instead of wav
